@@ -1,17 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Extractor de Datos de Fórmula 1 por Año (v8 - Extracción Robusta)
+Extractor de Datos de Fórmula 1 por Año (v11 - Corrección de Compatibilidad)
 
-Este script extrae datos de las sesiones de Carrera ('R') y Sprint ('S')
-para un AÑO ESPECÍFICO proporcionado como argumento de línea de comandos.
+Este script extrae datos para un AÑO ESPECÍFICO.
 
-NUEVAS FUNCIONALIDADES (v8):
-- La función process_session_data ahora es extremadamente robusta.
-- Cada tipo de dato (results, weather, laps, etc.) se extrae en su
-  propio bloque try-except.
-- Si una parte de los datos de una sesión falla (ej. results), el script
-  continuará intentando extraer las otras partes (ej. laps, telemetry).
-- Esto maximiza la recolección de datos incluso de sesiones parcialmente corruptas.
+NUEVAS FUNCIONALIDADES (v11):
+- Se eliminó el argumento 'timeout' de la función session.load() para
+  asegurar la compatibilidad con versiones anteriores de la librería FastF1.
+- Se mantiene la lógica robusta de verificación de tipos de datos para
+  prevenir el error 'tuple indices...' y maximizar la extracción de datos.
 """
 import fastf1
 import pandas as pd
@@ -43,12 +40,10 @@ fastf1.Cache.enable_cache(CACHE_DIR)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-# MODIFICADO: Versión súper robusta de la función de procesamiento.
 def process_session_data(session):
     """
-    Procesa y extrae los datos relevantes de una sesión cargada.
-    Cada pieza de datos se extrae en un bloque try-except separado para
-    maximizar la cantidad de datos recuperados incluso si algunas partes fallan.
+    Procesa los datos de una sesión, verificando el tipo de cada conjunto de datos
+    antes de manipularlo para evitar errores con datos mal cargados.
     """
     session_data = {'results': None, 'weather': None, 'race_control': None, 'laps': None, 'telemetry': None}
 
@@ -60,42 +55,44 @@ def process_session_data(session):
             results['EventName'] = session.event['EventName']
             results['SessionName'] = session.name
             session_data['results'] = results
+        elif not isinstance(results, pd.DataFrame):
+            logging.warning(f"  -> Los 'results' para {session.name} no son un DataFrame válido. Datos no disponibles.")
     except Exception as e:
-        logging.warning(f"No se pudieron procesar los 'results' para {session.name}: {e}")
+        logging.error(f"  -> Error inesperado al procesar 'results' para {session.name}: {e}")
 
     # --- Extraer Clima (Weather) ---
     try:
-        if session.weather_data is not None and not session.weather_data.empty:
-            weather = session.weather_data
-            weather['Year'] = session.event['EventDate'].year
-            weather['EventName'] = session.event['EventName']
-            weather['SessionName'] = session.name
-            session_data['weather'] = weather
+        weather_data = session.weather_data
+        if isinstance(weather_data, pd.DataFrame) and not weather_data.empty:
+            weather_data['Year'] = session.event['EventDate'].year
+            weather_data['EventName'] = session.event['EventName']
+            weather_data['SessionName'] = session.name
+            session_data['weather'] = weather_data
     except Exception as e:
-        logging.warning(f"No se pudieron procesar los 'weather_data' para {session.name}: {e}")
+        logging.error(f"  -> Error inesperado al procesar 'weather_data' para {session.name}: {e}")
 
     # --- Extraer Mensajes de Control de Carrera (Race Control) ---
     try:
-        if session.race_control_messages is not None and not session.race_control_messages.empty:
-            rcm = session.race_control_messages
+        rcm = session.race_control_messages
+        if isinstance(rcm, pd.DataFrame) and not rcm.empty:
             rcm['Year'] = session.event['EventDate'].year
             rcm['EventName'] = session.event['EventName']
             rcm['SessionName'] = session.name
             session_data['race_control'] = rcm
     except Exception as e:
-        logging.warning(f"No se pudieron procesar los 'race_control_messages' para {session.name}: {e}")
+        logging.error(f"  -> Error inesperado al procesar 'race_control_messages' para {session.name}: {e}")
         
     # --- Extraer Vueltas (Laps) y Telemetría ---
     try:
-        if session.laps is not None and not session.laps.empty:
-            laps = session.laps
+        laps = session.laps
+        if isinstance(laps, pd.DataFrame) and not laps.empty:
             laps['Year'] = session.event['EventDate'].year
             laps['EventName'] = session.event['EventName']
             laps['SessionName'] = session.name
             session_data['laps'] = laps
 
             all_telemetry = []
-            logging.info("Extrayendo telemetría vuelta por vuelta...")
+            logging.info("  -> Extrayendo telemetría vuelta por vuelta...")
             for lap in laps.iterlaps():
                 try:
                     telemetry = lap.get_telemetry()
@@ -107,12 +104,15 @@ def process_session_data(session):
                         telemetry['SessionName'] = session.name
                         all_telemetry.append(telemetry)
                 except Exception as e:
-                    logging.warning(f"No se pudo obtener telemetría para la vuelta {lap['LapNumber']} de {lap['Driver']}: {e}")
+                    logging.warning(f"    -> No se pudo obtener telemetría para la vuelta {lap['LapNumber']} de {lap['Driver']}: {e}")
             
             if all_telemetry:
                 session_data['telemetry'] = pd.concat(all_telemetry, ignore_index=True)
+        elif not isinstance(laps, pd.DataFrame):
+            logging.warning(f"  -> Los 'laps' para {session.name} no son un DataFrame válido. Telemetría no disponible.")
+            
     except Exception as e:
-        logging.warning(f"No se pudieron procesar los 'laps' y 'telemetry' para {session.name}: {e}")
+        logging.error(f"  -> Error inesperado al procesar 'laps' y 'telemetry' para {session.name}: {e}")
 
     return session_data
 
@@ -139,34 +139,31 @@ def main(year):
             logging.info(f"== Evento: {event['EventName']} ==")
 
             for session_name in SESSION_IDENTIFIERS_TO_FETCH:
-                session = None # Reseteamos la sesión
+                session = None
                 retries = 0
                 while retries < MAX_RETRIES:
                     try:
                         session = fastf1.get_session(year, event['RoundNumber'], session_name)
+                        # CORREGIDO: Se eliminó el argumento 'timeout'
                         session.load(laps=True, telemetry=True, weather=True, messages=True)
-                        logging.info(f"La sesión {session.name} se ha cargado en memoria.")
+                        logging.info(f"Sesión '{session.name}' cargada en memoria.")
                         break
 
                     except RateLimitExceededError:
                         logging.warning(f"Rate Limit Exceeded. Esperando {rate_limit_delay} seg... (Intento {retries + 1}/{MAX_RETRIES})")
-                        time.sleep(rate_limit_delay)
-                        retries += 1
-                        rate_limit_delay += RATE_LIMIT_INCREMENT
+                        time.sleep(rate_limit_delay); retries += 1; rate_limit_delay += RATE_LIMIT_INCREMENT
                     
                     except HTTPError as e:
                         status_code = e.response.status_code if e.response else "N/A"
                         logging.warning(f"Error HTTP {status_code}. Esperando {HTTP_ERROR_DELAY} seg... (Intento {retries + 1}/{MAX_RETRIES})")
-                        time.sleep(HTTP_ERROR_DELAY)
-                        retries += 1
+                        time.sleep(HTTP_ERROR_DELAY); retries += 1
 
                     except Exception as e:
                         logging.warning(f"No se pudo cargar la sesión '{session_name}' para {event['EventName']} {year}. Razón: {e}")
-                        session = None
-                        break
+                        session = None; break
                 
                 if retries == MAX_RETRIES:
-                    logging.error(f"Se superó el máximo de reintentos para cargar la sesión '{session_name}' de {event['EventName']} {year}.")
+                    logging.error(f"Se superó el máximo de reintentos para cargar la sesión '{session_name}'.")
 
                 if session:
                     logging.info(f"Procesando datos para la sesión: {session.name}")
@@ -179,7 +176,7 @@ def main(year):
                     if data['laps'] is not None: all_data_lists['laps'].append(data['laps'])
                     if data['telemetry'] is not None: all_data_lists['telemetry'].append(data['telemetry'])
                     
-                    logging.info(f"Datos de la sesión {session.name} procesados.")
+                    logging.info(f"Datos de la sesión {session.name} procesados y agregados a la lista.")
                     rate_limit_delay = INITIAL_RETRY_DELAY
 
     except Exception as e:
@@ -201,8 +198,7 @@ def main(year):
     save_to_csv(all_data_lists['events'], 'events', year_output_dir)
     if all_data_lists['sessions']:
         sessions_df = pd.DataFrame(all_data_lists['sessions'])
-        sessions_filename = f"sessions_{year}.csv"
-        sessions_df.to_csv(os.path.join(year_output_dir, sessions_filename), index=False, encoding='utf-8')
+        sessions_df.to_csv(os.path.join(year_output_dir, f"sessions_{year}.csv"), index=False, encoding='utf-8')
 
     save_to_csv(all_data_lists['results'], 'results', year_output_dir)
     save_to_csv(all_data_lists['weather'], 'weather', year_output_dir)
