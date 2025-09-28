@@ -13,6 +13,11 @@ Consolidar datos de telemetría agregados por sector en los archivos de laps exi
 
 2. **Telemetría** (`f1_telemetry_data/año/circuito/telemetry_PILOTO.csv`):
    - Datos por milisegundos por piloto y circuito
+   - **Mapeo de nombres**: Los nombres de eventos usan underscores en lugar de espacios
+     - Ejemplo: `Bahrain Grand Prix` (laps) → `Bahrain_Grand_Prix` (telemetría)
+   - **Extracción de piloto**: El código del piloto se extrae del nombre del archivo
+     - Ejemplo: `telemetry_ALO.csv` → código de piloto `ALO`
+   - **Datos específicos de carrera**: Solo contienen datos de la sesión de carrera (Race)
    - Campos: `Date,SessionTime,DriverAhead,DistanceToDriverAhead,Time,RPM,Speed,nGear,Throttle,Brake,DRS,Source,Distance,RelativeDistance,Status,X,Y,Z,LapNumber`
 
 ### Segmentación por Sector

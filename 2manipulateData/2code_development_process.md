@@ -102,6 +102,18 @@ def load_data(year):
     events = laps_df['EventName'].unique()
 
     return laps_df, events
+
+### Mapeo de Nombres de Eventos
+```python
+def event_name_to_directory(event_name):
+    """Convertir nombre de evento de laps a formato de directorio de telemetría."""
+    return event_name.replace(' ', '_')
+
+def extract_driver_code_from_filename(filename):
+    """Extraer código de piloto del nombre del archivo de telemetría."""
+    # telemetry_ALO.csv -> ALO
+    return filename.replace('telemetry_', '').replace('.csv', '')
+```
 ```
 
 ### 2. Procesamiento por Vuelta

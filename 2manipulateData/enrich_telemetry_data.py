@@ -28,7 +28,7 @@ TELEMETRY_DIR = 'f1_telemetry_data'
 def setup_logging(year):
     """Configurar logging específico para el año."""
     logging.basicConfig(
-        level=logging.DEBUG,  # Cambiar a DEBUG para ver más detalles
+        level=logging.INFO,  # Volver a INFO
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[
             logging.FileHandler(f'telemetry_enrichment_{year}.log'),
@@ -45,11 +45,14 @@ def load_laps_data(year):
 
     laps_df = pd.read_csv(laps_file)
 
-    # Convertir timestamps de sector a numeric para evitar errores de comparación
+    # Convertir timestamps de sector a timedelta para consistencia con telemetría
     timestamp_columns = ['Sector1SessionTime', 'Sector2SessionTime', 'Sector3SessionTime']
     for col in timestamp_columns:
         if col in laps_df.columns:
-            laps_df[col] = pd.to_numeric(laps_df[col], errors='coerce')
+            if laps_df[col].dtype == 'object':
+                laps_df[col] = pd.to_timedelta(laps_df[col], errors='coerce')
+            else:
+                laps_df[col] = pd.to_numeric(laps_df[col], errors='coerce')
 
     events = laps_df['EventName'].unique()
 
@@ -78,11 +81,19 @@ def load_telemetry_data(year, event_name):
 
         try:
             df = pd.read_csv(file_path)
-            # Convertir SessionTime a numeric si es string
+
+            # Convertir SessionTime a formato timedelta si es necesario
             if df['SessionTime'].dtype == 'object':
-                df['SessionTime'] = pd.to_numeric(df['SessionTime'], errors='coerce')
+                # Si es string como "0 days 00:37:09.970000", convertir a timedelta
+                df['SessionTime'] = pd.to_timedelta(df['SessionTime'], errors='coerce')
+
+            # Convertir LapNumber a float para consistencia
+            df['LapNumber'] = pd.to_numeric(df['LapNumber'], errors='coerce')
+
             telemetry_data[driver_code] = df
-            logging.info(f"Cargada telemetría para {driver_code} en {event_name}")
+            logging.info(f"Cargada telemetría para {driver_code} en {event_name}: {len(df)} puntos de datos")
+            logging.debug(f"DEBUG - {driver_code}: LapNumbers únicos = {sorted(df['LapNumber'].unique())}")
+
         except Exception as e:
             logging.error(f"Error cargando telemetría para {driver_code}: {e}")
 
