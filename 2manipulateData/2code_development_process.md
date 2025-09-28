@@ -152,8 +152,88 @@ def validate_sector_data(sector_data, lap_data, sector_num):
 - Si faltan timestamps de sector: usar inicio/fin de vuelta como fallback
 - Logging detallado de datos faltantes para análisis posterior
 
+#### Configuración de Logging
+```python
+import logging
+
+# Configurar logging con archivo por año
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(f'telemetry_enrichment_{year}.log'),
+        logging.StreamHandler()  # También en consola
+    ]
+)
+
+# Ejemplos de mensajes de logging:
+logging.info(f"Procesando {event_name} - {driver} - Vuelta {lap_number}")
+logging.warning(f"No telemetría para {driver} en vuelta {lap_number} de {event_name}")
+logging.error(f"Timestamps de sector inconsistentes: {event_name} - {driver} - Vuelta {lap_number}")
+logging.info(f"Métricas calculadas para Sector 1: RPM_Avg={rpm_avg}, Speed_Max={speed_max}")
+logging.info(f"Archivo enriquecido guardado: laps_{year}_enriched.csv - Total vueltas: {total_laps}")
+```
+
 ### Optimización de Performance
 - Cargar telemetría por evento (no por vuelta individual)
 - Usar indexación por `LapNumber` para filtrado rápido
 - Procesar en chunks para manejar memoria
 - Paralelización por evento si es necesario
+
+## Estructura del Script Principal
+
+### Configuración de Argumentos por Año
+```python
+import argparse
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Enriquecer datos de laps con telemetría por año específico")
+    parser.add_argument("year", type=int, help="Año para procesar (ej: 2021, 2022, 2023)")
+    args = parser.parse_args()
+
+    # Procesar solo el año especificado
+    main(args.year)
+```
+
+### Función Principal
+```python
+def main(year):
+    """Función principal para enriquecer datos de laps con telemetría por año específico."""
+
+    # Configurar logging específico para el año
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(f'telemetry_enrichment_{year}.log'),
+            logging.StreamHandler()
+        ]
+    )
+
+    logging.info(f"--- INICIO DEL ENRIQUECIMIENTO DE TELEMETRÍA PARA EL AÑO {year} ---")
+
+    # Cargar datos base
+    laps_df, events = load_data(year)
+
+    # Procesar cada evento
+    enriched_laps = []
+    for event_name in events:
+        event_laps = process_event(laps_df, event_name, year)
+        enriched_laps.extend(event_laps)
+
+    # Guardar archivo enriquecido
+    save_enriched_data(enriched_laps, year)
+
+    logging.info(f"¡ENRIQUECIMIENTO PARA EL AÑO {year} COMPLETADO!")
+```
+
+### Ejecución
+```bash
+# Procesar solo 2021
+python enrich_telemetry_data.py 2021
+
+# Procesar solo 2022
+python enrich_telemetry_data.py 2022
+
+# Etc.
+```
