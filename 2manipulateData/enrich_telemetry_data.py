@@ -19,7 +19,6 @@ import logging
 import os
 import argparse
 import glob
-from scipy import stats
 
 # --- Configuración de Directorios ---
 DATA_LAKE_DIR = 'f1_data_lake_focused'
@@ -126,17 +125,17 @@ def calculate_mode_metrics(sector_data):
 
     result = {}
 
-    # nGear Mode
+    # nGear Mode - usar pandas mode() en lugar de scipy.stats.mode()
     if 'nGear' in sector_data.columns and not sector_data['nGear'].empty:
-        mode_result = stats.mode(sector_data['nGear'].dropna())
-        result['nGear_Mode'] = mode_result.mode[0] if len(mode_result.mode) > 0 else None
+        gear_mode = sector_data['nGear'].dropna().mode()
+        result['nGear_Mode'] = gear_mode.iloc[0] if len(gear_mode) > 0 else None
     else:
         result['nGear_Mode'] = None
 
-    # Status Mode
+    # Status Mode - usar pandas mode() en lugar de scipy.stats.mode()
     if 'Status' in sector_data.columns and not sector_data['Status'].empty:
-        mode_result = stats.mode(sector_data['Status'].dropna())
-        result['Status_Mode'] = mode_result.mode[0] if len(mode_result.mode) > 0 else None
+        status_mode = sector_data['Status'].dropna().mode()
+        result['Status_Mode'] = status_mode.iloc[0] if len(status_mode) > 0 else None
     else:
         result['Status_Mode'] = None
 
