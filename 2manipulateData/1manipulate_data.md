@@ -57,12 +57,12 @@ Usar `SessionTime` de telemetría para mapear con los timestamps de sector:
 - `SectorX_Speed_StdDev`: Variabilidad de velocidad (desviación estándar)
 - `SectorX_Distance_Sector`: Distancia recorrida en el sector
 
-## Resultado Final
+## Resultado Intermedio
 - **Archivo de salida**: `laps_año_enriched.csv`
 - **Nuevas columnas**: ~39 columnas adicionales (13 métricas × 3 sectores)
 - **Ubicación**: `f1_data_lake_focused/año/laps_año_enriched.csv`
 
-## Proceso de Consolidación
+## Proceso de Consolidación (Fase 1: Enriquecimiento con Telemetría)
 1. Leer archivo de laps base por año
 2. Para cada vuelta (por piloto, circuito, lap number):
    - Cargar telemetría correspondiente del piloto y circuito
@@ -70,7 +70,51 @@ Usar `SessionTime` de telemetría para mapear con los timestamps de sector:
    - Segmentar por sectores usando `SessionTime`
    - Calcular métricas agregadas por sector
    - Agregar columnas al registro de lap
-3. Guardar archivo enriquecido
+3. Guardar archivo enriquecido (`laps_año_enriched.csv`)
+
+## Proceso de Desnormalización (Fase 2: Preparación para BigQuery)
+
+### Objetivo
+Crear una tabla "ancha" completamente desnormalizada que incluya tanto las métricas de telemetría como el contexto de eventos, evitando JOINs costosos en BigQuery.
+
+### Datos de Entrada
+1. **Laps Enriquecido** (`f1_data_lake_focused/año/laps_año_enriched.csv`):
+   - Ya contiene las 39 columnas de telemetría por sector
+   - Contiene: `Year`, `EventName`, `SessionName`
+
+2. **Events** (`f1_data_lake_focused/año/events_año.csv`):
+   - Contiene metadatos de los Grandes Premios
+   - Campos clave: `Country`, `Location`, `OfficialEventName`, `EventDate`, `EventFormat`
+
+### Columnas Añadidas en Fase 2
+- `Country`: País anfitrión del GP
+- `Location`: Ciudad/circuito específico
+- `OfficialEventName`: Nombre oficial completo del evento
+- `EventDate`: Fecha del evento (día de la carrera)
+- `EventFormat`: Formato del fin de semana (conventional, sprint, etc.)
+
+### Resultado Final para BigQuery
+- **Archivo de salida**: `laps_año_enriched_final.csv`
+- **Total de columnas**: ~90 columnas (85 de fase 1 + 5 de fase 2)
+- **Ubicación**: `f1_data_lake_focused/año/laps_año_enriched_final.csv`
+- **Destino**: Google BigQuery Data Warehouse
+
+### Proceso de Desnormalización
+1. Leer `laps_año_enriched.csv` (resultado de Fase 1)
+2. Leer `events_año.csv`
+3. Realizar LEFT JOIN usando `EventName` como clave
+4. Validar que no haya valores NULL en las nuevas columnas
+5. Guardar `laps_año_enriched_final.csv`
+
+### Scripts Involucrados
+- **Fase 1**: `enrich_telemetry_data.py` - Añade métricas de telemetría
+- **Fase 2**: `finish_etl_laps.py` - Desnormaliza con datos de events
+
+### Beneficios para BigQuery
+- ✅ Sin necesidad de JOINs en queries (mejora performance)
+- ✅ Todas las columnas de contexto disponibles directamente
+- ✅ Optimización para análisis OLAP
+- ✅ Ideal para herramientas de BI como Looker
 
 ## Validación
 - Verificar que `Distance_Sector` sumado por los 3 sectores sea consistente

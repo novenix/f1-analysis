@@ -184,6 +184,9 @@ logging.warning(f"No telemetría para {driver} en vuelta {lap_number} de {event_
 logging.error(f"Timestamps de sector inconsistentes: {event_name} - {driver} - Vuelta {lap_number}")
 logging.info(f"Métricas calculadas para Sector 1: RPM_Avg={rpm_avg}, Speed_Max={speed_max}")
 logging.info(f"Archivo enriquecido guardado: laps_{year}_enriched.csv - Total vueltas: {total_laps}")
+
+# NOTA: Este archivo es intermedio. Para BigQuery, se requiere un paso adicional
+# de desnormalización ejecutando finish_etl_laps.py que genera laps_{year}_enriched_final.csv
 ```
 
 ### Optimización de Performance
@@ -248,4 +251,62 @@ python enrich_telemetry_data.py 2021
 python enrich_telemetry_data.py 2022
 
 # Etc.
+```
+
+---
+
+## Pipeline Completo ETL para BigQuery
+
+### Paso 1: Enriquecimiento con Telemetría
+```bash
+python enrich_telemetry_data.py 2021
+python enrich_telemetry_data.py 2022
+python enrich_telemetry_data.py 2023
+python enrich_telemetry_data.py 2024
+python enrich_telemetry_data.py 2025
+```
+**Salida**: `laps_año_enriched.csv` (85 columnas)
+
+### Paso 2: Desnormalización con Events (Preparación BigQuery)
+```bash
+python finish_etl_laps.py
+```
+Este script:
+- Procesa automáticamente todos los años (2021-2025)
+- Lee `laps_año_enriched.csv` y `events_año.csv`
+- Realiza LEFT JOIN por `EventName`
+- Añade: `Country`, `Location`, `OfficialEventName`, `EventDate`, `EventFormat`
+- Genera: `laps_año_enriched_final.csv` (90 columnas)
+
+**Salida**: `laps_año_enriched_final.csv` - Listo para BigQuery
+
+### Arquitectura de Datos
+
+```
+f1_data_lake_focused/
+├── 2021/
+│   ├── laps_2021.csv                    # Base (33 columnas)
+│   ├── laps_2021_enriched.csv           # + Telemetría (85 columnas)
+│   ├── laps_2021_enriched_final.csv     # + Events (90 columnas) ← BigQuery
+│   └── events_2021.csv
+├── 2022/
+│   └── ...
+...
+```
+
+### Flujo de Datos
+```
+laps_base.csv (33 cols)
+    ↓
+[enrich_telemetry_data.py]
+    ↓
+laps_enriched.csv (85 cols)
+    ↓
+[finish_etl_laps.py]
+    ↓
+laps_enriched_final.csv (90 cols)
+    ↓
+[Carga a BigQuery]
+    ↓
+BigQuery Data Warehouse
 ```
