@@ -1,0 +1,434 @@
+================================================================================
+RESULTADOS DE QUERIES OPTIMIZADAS - F1 ANALYTICS
+================================================================================
+Proyecto: topicos-bases-datos
+Dataset: f1_data_warehouse
+Fecha: 2025-10-05 18:36:41
+Total de queries: 8
+================================================================================
+
+
+================================================================================
+QUERY #1: Análisis por Piloto y Evento
+================================================================================
+
+SQL Query:
+--------------------------------------------------------------------------------
+SELECT
+  LapNumber,
+  Compound,
+  TyreLife,
+  CAST(LapTime AS STRING) as LapTime,
+  Sector1_Speed_Avg,
+  Sector2_Speed_Avg,
+  Sector3_Speed_Avg
+FROM `topicos-bases-datos.f1_data_warehouse.laps_enriched`
+WHERE EventDate = '2024-03-02'           
+  AND Driver = 'VER'                     
+  AND EventName = 'Bahrain Grand Prix'  
+  AND SessionName = 'Race'
+ORDER BY LapNumber;
+--------------------------------------------------------------------------------
+
+📊 Estadísticas de la Query:
+  • Filas retornadas: 57
+  • Bytes procesados: 0.00 MB
+  • Bytes facturados: 0.00 MB
+  • Duración: 0:00:00.114000
+
+Resultados:
+--------------------------------------------------------------------------------
+LapNumber       | Compound        | TyreLife        | LapTime         | Sector1_Speed_Avg | Sector2_Speed_Avg | Sector3_Speed_Avg
+---------------------------------------------------------------------------------------------------------------------------------
+1.0             | SOFT            | 4.0             | 0 days 00:01:37.284000 | 189.120876459521 | 180.73361469248704 | 215.31766411952032
+2.0             | SOFT            | 5.0             | 0 days 00:01:36.296000 | 205.18853417984417 | 188.60323833495409 | 212.725081145516
+3.0             | SOFT            | 6.0             | 0 days 00:01:36.753000 | 205.3981659654896 | 188.6661544255143 | 214.7062528371156
+4.0             | SOFT            | 7.0             | 0 days 00:01:36.647000 | 204.11649963928963 | 189.3278355644572 | 213.58426419872285
+5.0             | SOFT            | 8.0             | 0 days 00:01:37.173000 | 205.65521106280977 | 187.01569888919175 | 210.7891441190551
+6.0             | SOFT            | 9.0             | 0 days 00:01:37.092000 | 206.52318055844273 | 187.7440451510928 | 207.29202924495215
+7.0             | SOFT            | 10.0            | 0 days 00:01:37.038000 | 204.98652335154563 | 186.8743076784696 | 207.4281293639678
+8.0             | SOFT            | 11.0            | 0 days 00:01:37.024000 | 205.67402076942375 | 188.09330667283447 | 213.2019597768311
+9.0             | SOFT            | 12.0            | 0 days 00:01:37.229000 | 204.29802979803597 | 189.229775119538 | 211.2656101065752
+10.0            | SOFT            | 13.0            | 0 days 00:01:36.960000 | 203.84547578220975 | 187.03282300431417 | 211.12084502003623
+11.0            | SOFT            | 14.0            | 0 days 00:01:37.085000 | 203.5995931993789 | 187.11029397579333 | 211.1792692027032
+12.0            | SOFT            | 15.0            | 0 days 00:01:37.045000 | 207.98376270704057 | 187.190811117374 | 211.2446153081887
+13.0            | SOFT            | 16.0            | 0 days 00:01:37.030000 | 206.7810415004465 | 187.3034816944712 | 211.44287714741787
+14.0            | SOFT            | 17.0            | 0 days 00:01:37.028000 | 208.4896744537268 | 187.7237709393586 | 213.69486563800947
+15.0            | SOFT            | 18.0            | 0 days 00:01:37.011000 | 204.96587609365105 | 185.8828088895928 | 209.25804318557925
+16.0            | SOFT            | 19.0            | 0 days 00:01:37.168000 | 206.04107681665727 | 186.11338449782085 | 211.1301432440507
+17.0            | SOFT            | 20.0            | 0 days 00:01:39.896000 | 206.0140768456782 | 187.8181676013171 | 184.66777635266587
+18.0            | HARD            | 1.0             | 0 days 00:01:57.854000 | 118.53016718581269 | 187.86789690383236 | 216.01408743009395
+19.0            | HARD            | 2.0             | 0 days 00:01:35.283000 | 206.0408005501419 | 192.66082590022444 | 213.53341979597784
+20.0            | HARD            | 3.0             | 0 days 00:01:35.160000 | 209.04774798823627 | 190.87300943441727 | 216.95406221870783
+... (37 filas adicionales omitidas)
+
+✅ Query ejecutada exitosamente
+
+
+================================================================================
+QUERY #2: Comparación entre Pilotos en un Evento
+================================================================================
+
+SQL Query:
+--------------------------------------------------------------------------------
+SELECT
+  Driver,
+  Team,
+  COUNT(*) as total_laps,
+  ROUND(AVG(Sector1_Speed_Avg), 2) as avg_speed_s1,
+  ROUND(AVG(Sector2_Speed_Avg), 2) as avg_speed_s2,
+  ROUND(AVG(Sector3_Speed_Avg), 2) as avg_speed_s3
+FROM `topicos-bases-datos.f1_data_warehouse.laps_enriched`
+WHERE EventDate BETWEEN '2024-05-24' AND '2024-05-26'  
+  AND EventName = 'Monaco Grand Prix'                   
+  AND Country = 'Monaco'                                 
+  AND SessionName = 'Race'
+GROUP BY Driver, Team
+ORDER BY avg_speed_s1 DESC
+LIMIT 5;
+--------------------------------------------------------------------------------
+
+📊 Estadísticas de la Query:
+  • Filas retornadas: 5
+  • Bytes procesados: 0.00 MB
+  • Bytes facturados: 0.00 MB
+  • Duración: 0:00:00.115000
+
+Resultados:
+--------------------------------------------------------------------------------
+Driver          | Team            | total_laps      | avg_speed_s1    | avg_speed_s2    | avg_speed_s3   
+---------------------------------------------------------------------------------------------------------
+PIA             | McLaren         | 78              | 180.1           | 135.29          | 143.05         
+LEC             | Ferrari         | 78              | 179.99          | 135.52          | 142.3          
+SAI             | Ferrari         | 78              | 179.65          | 134.82          | 143.39         
+NOR             | McLaren         | 78              | 179.39          | 135.13          | 143.16         
+VER             | Red Bull Racing | 78              | 178.6           | 135.81          | 142.71         
+
+✅ Query ejecutada exitosamente
+
+
+================================================================================
+QUERY #3: Análisis Temporal (Multi-año)
+================================================================================
+
+SQL Query:
+--------------------------------------------------------------------------------
+SELECT
+  Year,
+  Driver,
+  MIN(CAST(LapTime AS STRING)) as best_lap,
+  COUNT(*) as total_laps,
+  ROUND(AVG(Sector1_Speed_Avg), 2) as avg_speed_s1,
+  ROUND(AVG(Sector2_Speed_Avg), 2) as avg_speed_s2,
+  ROUND(AVG(Sector3_Speed_Avg), 2) as avg_speed_s3
+FROM `topicos-bases-datos.f1_data_warehouse.laps_enriched`
+WHERE Country = 'Great Britain'           
+  AND EventName = 'British Grand Prix'    
+  AND SessionName = 'Race'
+  AND Year BETWEEN 2021 AND 2024
+GROUP BY Year, Driver
+HAVING total_laps > 10  
+ORDER BY Year, avg_speed_s1 DESC;
+--------------------------------------------------------------------------------
+
+📊 Estadísticas de la Query:
+  • Filas retornadas: 55
+  • Bytes procesados: 0.29 MB
+  • Bytes facturados: 10.00 MB
+  • Duración: 0:00:00.354000
+
+Resultados:
+--------------------------------------------------------------------------------
+Year            | Driver          | best_lap        | total_laps      | avg_speed_s1    | avg_speed_s2    | avg_speed_s3   
+---------------------------------------------------------------------------------------------------------------------------
+2021            | HAM             | 0 days 00:01:29.699000 | 52              | 212.4           | 228.56          | 218.81         
+2021            | BOT             | 0 days 00:01:30.524000 | 52              | 211.97          | 227.11          | 217.66         
+2021            | LEC             | 0 days 00:01:30.569000 | 52              | 211.37          | 228.54          | 218.46         
+2021            | STR             | 0 days 00:01:31.992000 | 52              | 211.05          | 222.13          | 214.3          
+2021            | TSU             | 0 days 00:01:30.826000 | 52              | 210.87          | 222.23          | 213.16         
+2021            | SAI             | 0 days 00:01:31.223000 | 52              | 210.83          | 226.36          | 216.01         
+2021            | NOR             | 0 days 00:01:31.418000 | 52              | 210.27          | 227.5           | 216.4          
+2021            | RUS             | 0 days 00:01:32.049000 | 51              | 209.71          | 221.71          | 212.21         
+2021            | RIC             | 0 days 00:01:31.284000 | 52              | 209.67          | 226.57          | 215.8          
+2021            | OCO             | 0 days 00:01:32.210000 | 52              | 209.66          | 223.47          | 214.35         
+2021            | LAT             | 0 days 00:01:32.477000 | 51              | 209.5           | 221.84          | 212.22         
+2021            | GIO             | 0 days 00:01:32.346000 | 51              | 209.25          | 222.17          | 213.62         
+2021            | ALO             | 0 days 00:01:31.698000 | 52              | 208.68          | 225.5           | 213.82         
+2021            | GAS             | 0 days 00:01:30.266000 | 52              | 208.64          | 223.47          | 214.31         
+2021            | PER             | 0 days 00:01:28.617000 | 51              | 208.19          | 222.76          | 212.51         
+2021            | MAZ             | 0 days 00:01:32.909000 | 51              | 207.73          | 218.95          | 209.5          
+2021            | RAI             | 0 days 00:01:31.895000 | 51              | 207.62          | 222.48          | 214.35         
+2021            | MSC             | 0 days 00:01:32.862000 | 51              | 207.27          | 218.65          | 210.12         
+2021            | VET             | 0 days 00:01:33.059000 | 40              | 206.88          | 218.71          | 209.15         
+2022            | LEC             | 0 days 00:01:31.282000 | 52              | 206.71          | 220.99          | 212.27         
+... (35 filas adicionales omitidas)
+
+✅ Query ejecutada exitosamente
+
+
+================================================================================
+QUERY #4: Análisis por País/Región
+================================================================================
+
+SQL Query:
+--------------------------------------------------------------------------------
+SELECT
+  Year,
+  EventName,
+  Team,
+  COUNT(*) as total_laps,
+  ROUND(AVG(Sector1_Speed_Avg), 2) as avg_speed
+FROM `topicos-bases-datos.f1_data_warehouse.laps_enriched`
+WHERE Country = 'Italy'                   
+  AND SessionName = 'Race'
+GROUP BY Year, EventName, Team
+ORDER BY Year DESC, avg_speed DESC;
+--------------------------------------------------------------------------------
+
+📊 Estadísticas de la Query:
+  • Filas retornadas: 90
+  • Bytes procesados: 0.00 MB
+  • Bytes facturados: 0.00 MB
+  • Duración: 0:00:00.175000
+
+Resultados:
+--------------------------------------------------------------------------------
+Year            | EventName       | Team            | total_laps      | avg_speed      
+---------------------------------------------------------------------------------------
+2025            | Italian Grand Prix | Ferrari         | 106             | 247.68         
+2025            | Italian Grand Prix | McLaren         | 106             | 247.14         
+2025            | Italian Grand Prix | Mercedes        | 106             | 246.23         
+2025            | Italian Grand Prix | Red Bull Racing | 106             | 245.88         
+2025            | Italian Grand Prix | Racing Bulls    | 106             | 245.2          
+2025            | Italian Grand Prix | Haas F1 Team    | 105             | 245.13         
+2025            | Italian Grand Prix | Alpine          | 104             | 243.77         
+2025            | Italian Grand Prix | Aston Martin    | 76              | 243.22         
+2025            | Italian Grand Prix | Kick Sauber     | 54              | 241.21         
+2025            | Emilia Romagna Grand Prix | Mercedes        | 108             | 235.71         
+2025            | Emilia Romagna Grand Prix | Ferrari         | 126             | 235.66         
+2025            | Emilia Romagna Grand Prix | McLaren         | 126             | 235.38         
+2025            | Emilia Romagna Grand Prix | Williams        | 126             | 234.7          
+2025            | Emilia Romagna Grand Prix | Kick Sauber     | 126             | 234.45         
+2025            | Emilia Romagna Grand Prix | Haas F1 Team    | 91              | 234.21         
+2025            | Emilia Romagna Grand Prix | Red Bull Racing | 126             | 234.18         
+2025            | Emilia Romagna Grand Prix | Racing Bulls    | 126             | 233.8          
+2025            | Emilia Romagna Grand Prix | Alpine          | 126             | 233.8          
+2025            | Emilia Romagna Grand Prix | Aston Martin    | 126             | 233.49         
+2025            | Italian Grand Prix | Williams        | 106             | 221.29         
+... (70 filas adicionales omitidas)
+
+✅ Query ejecutada exitosamente
+
+
+================================================================================
+QUERY #5: Análisis de Neumáticos
+================================================================================
+
+SQL Query:
+--------------------------------------------------------------------------------
+SELECT
+  Compound,
+  TyreLife,
+  COUNT(*) as laps_count,
+  ROUND(AVG(Sector1_Speed_Avg), 2) as avg_speed_s1,
+  ROUND(AVG(Sector2_Speed_Avg), 2) as avg_speed_s2,
+  ROUND(AVG(Sector3_Speed_Avg), 2) as avg_speed_s3
+FROM `topicos-bases-datos.f1_data_warehouse.laps_enriched`
+WHERE EventDate BETWEEN '2024-03-22' AND '2024-03-24'  
+  AND EventName = 'Australian Grand Prix'               
+  AND SessionName = 'Race'
+  AND TyreLife <= 30  
+GROUP BY Compound, TyreLife
+HAVING laps_count > 5  
+ORDER BY Compound, TyreLife;
+--------------------------------------------------------------------------------
+
+📊 Estadísticas de la Query:
+  • Filas retornadas: 43
+  • Bytes procesados: 0.00 MB
+  • Bytes facturados: 0.00 MB
+  • Duración: 0:00:00.106000
+
+Resultados:
+--------------------------------------------------------------------------------
+Compound        | TyreLife        | laps_count      | avg_speed_s1    | avg_speed_s2    | avg_speed_s3   
+---------------------------------------------------------------------------------------------------------
+HARD            | 1.0             | 25              | 181.08          | 268.28          | 208.94         
+HARD            | 2.0             | 35              | 207.19          | 274.42          | 211.31         
+HARD            | 3.0             | 35              | 217.28          | 274.36          | 210.97         
+HARD            | 4.0             | 35              | 217.99          | 276.44          | 210.35         
+HARD            | 5.0             | 35              | 217.45          | 276.77          | 211.98         
+HARD            | 6.0             | 35              | 217.61          | 277.76          | 212.41         
+HARD            | 7.0             | 35              | 217.65          | 278.53          | 209.83         
+HARD            | 8.0             | 35              | 216.63          | 275.23          | 208.95         
+HARD            | 9.0             | 35              | 214.37          | 271.68          | 206.91         
+HARD            | 10.0            | 34              | 213.89          | 272.66          | 210.05         
+HARD            | 11.0            | 34              | 219.33          | 276.68          | 211.69         
+HARD            | 12.0            | 34              | 217.07          | 271.62          | 210.85         
+HARD            | 13.0            | 33              | 218.64          | 277.99          | 212.74         
+HARD            | 14.0            | 33              | 218.02          | 277.87          | 213.44         
+HARD            | 15.0            | 33              | 219.17          | 278.47          | 212.37         
+HARD            | 16.0            | 33              | 216.34          | 274.47          | 212.63         
+HARD            | 17.0            | 32              | 217.21          | 271.13          | 207.53         
+HARD            | 18.0            | 30              | 216.04          | 273.5           | 207.97         
+HARD            | 19.0            | 28              | 216.85          | 273.58          | 210.87         
+HARD            | 20.0            | 27              | 215.25          | 269.8           | 209.59         
+... (23 filas adicionales omitidas)
+
+✅ Query ejecutada exitosamente
+
+
+================================================================================
+QUERY #6: Unir con tabla Weather
+================================================================================
+
+SQL Query:
+--------------------------------------------------------------------------------
+SELECT
+  l.EventName,
+  l.Driver,
+  ROUND(AVG(w.TrackTemp), 1) as avg_track_temp,
+  ROUND(AVG(l.Sector1_Speed_Avg), 2) as avg_speed
+FROM `topicos-bases-datos.f1_data_warehouse.laps_enriched` l
+JOIN `topicos-bases-datos.f1_data_warehouse.weather` w
+  ON l.EventName = w.EventName
+  AND l.Year = w.Year
+  AND l.SessionName = w.SessionName
+WHERE l.EventDate = '2024-07-07'          
+  AND l.EventName = 'British Grand Prix'  
+  AND l.SessionName = 'Race'
+GROUP BY l.EventName, l.Driver
+ORDER BY avg_speed DESC;
+--------------------------------------------------------------------------------
+
+📊 Estadísticas de la Query:
+  • Filas retornadas: 20
+  • Bytes procesados: 0.00 MB
+  • Bytes facturados: 0.00 MB
+  • Duración: 0:00:00.108000
+
+Resultados:
+--------------------------------------------------------------------------------
+EventName       | Driver          | avg_track_temp  | avg_speed      
+---------------------------------------------------------------------
+British Grand Prix | PIA             | 27.7            | 213.26         
+British Grand Prix | NOR             | 27.7            | 212.51         
+British Grand Prix | VER             | 27.7            | 212.51         
+British Grand Prix | HUL             | 27.7            | 212.46         
+British Grand Prix | HAM             | 27.7            | 212.18         
+British Grand Prix | STR             | 27.7            | 211.86         
+British Grand Prix | ALO             | 27.7            | 211.71         
+British Grand Prix | RUS             | 27.7            | 211.65         
+British Grand Prix | TSU             | 27.7            | 211.39         
+British Grand Prix | MAG             | 27.7            | 211.11         
+British Grand Prix | SAI             | 27.7            | 210.93         
+British Grand Prix | ALB             | 27.7            | 210.71         
+British Grand Prix | RIC             | 27.7            | 210.71         
+British Grand Prix | BOT             | 27.7            | 209.94         
+British Grand Prix | SAR             | 27.7            | 209.44         
+British Grand Prix | LEC             | 27.7            | 207.45         
+British Grand Prix | OCO             | 27.7            | 204.42         
+British Grand Prix | PER             | 27.7            | 204.19         
+British Grand Prix | ZHO             | 27.7            | 202.31         
+British Grand Prix | GAS             | 27.7            | 0.0            
+
+✅ Query ejecutada exitosamente
+
+
+================================================================================
+QUERY #7: Análisis de Sectores (Clasificación de velocidad)
+================================================================================
+
+SQL Query:
+--------------------------------------------------------------------------------
+SELECT
+  EventName,
+  Country,
+  ROUND(AVG(Sector1_Speed_Avg), 2) as sector1_avg_speed,
+  ROUND(AVG(Sector2_Speed_Avg), 2) as sector2_avg_speed,
+  ROUND(AVG(Sector3_Speed_Avg), 2) as sector3_avg_speed,
+  CASE
+    WHEN AVG(Sector1_Speed_Avg) > 200 THEN 'High Speed'
+    WHEN AVG(Sector1_Speed_Avg) > 150 THEN 'Medium Speed'
+    ELSE 'Low Speed'
+  END as sector1_type
+FROM `topicos-bases-datos.f1_data_warehouse.laps_enriched`
+WHERE Year = 2024
+  AND SessionName = 'Race'
+GROUP BY EventName, Country
+ORDER BY sector1_avg_speed DESC;
+--------------------------------------------------------------------------------
+
+📊 Estadísticas de la Query:
+  • Filas retornadas: 24
+  • Bytes procesados: 0.00 MB
+  • Bytes facturados: 0.00 MB
+  • Duración: 0:00:00.146000
+
+Resultados:
+--------------------------------------------------------------------------------
+EventName       | Country         | sector1_avg_speed | sector2_avg_speed | sector3_avg_speed | sector1_type   
+---------------------------------------------------------------------------------------------------------------
+Belgian Grand Prix | Belgium         | 253.49          | 205.87          | 233.88          | High Speed     
+Italian Grand Prix | Italy           | 242.82          | 223.72          | 260.49          | High Speed     
+Emilia Romagna Grand Prix | Italy           | 242.38          | 200.62          | 197.07          | High Speed     
+Austrian Grand Prix | Austria         | 241.13          | 189.44          | 232.03          | High Speed     
+Spanish Grand Prix | Spain           | 239.4           | 194.25          | 186.22          | High Speed     
+Abu Dhabi Grand Prix | United Arab Emirates | 233.78          | 215.31          | 183.18          | High Speed     
+Mexico City Grand Prix | Mexico          | 224.33          | 160.63          | 144.98          | High Speed     
+Qatar Grand Prix | Qatar           | 215.93          | 183.37          | 224.48          | High Speed     
+Australian Grand Prix | Australia       | 214.43          | 272.42          | 207.62          | High Speed     
+United States Grand Prix | United States   | 213.09          | 197.28          | 166.02          | High Speed     
+Japanese Grand Prix | Japan           | 211.89          | 204.31          | 202.59          | High Speed     
+British Grand Prix | United Kingdom  | 209.83          | 225.26          | 216.11          | High Speed     
+Saudi Arabian Grand Prix | Saudi Arabia    | 208.94          | 239.82          | 235.89          | High Speed     
+Dutch Grand Prix | Netherlands     | 204.91          | 187.93          | 205.71          | High Speed     
+Hungarian Grand Prix | Hungary         | 202.92          | 180.97          | 163.6           | High Speed     
+Bahrain Grand Prix | Bahrain         | 202.42          | 186.26          | 211.68          | High Speed     
+Singapore Grand Prix | Singapore       | 198.84          | 153.72          | 189.08          | Medium Speed   
+Miami Grand Prix | United States   | 198.46          | 184.73          | 228.91          | Medium Speed   
+São Paulo Grand Prix | Brazil          | 193.33          | 146.79          | 207.33          | Medium Speed   
+Azerbaijan Grand Prix | Azerbaijan      | 182.07          | 160.8           | 269.02          | Medium Speed   
+... (4 filas adicionales omitidas)
+
+✅ Query ejecutada exitosamente
+
+
+================================================================================
+QUERY #8: Estadísticas de Piloto Completas (Para DynamoDB)
+================================================================================
+
+SQL Query:
+--------------------------------------------------------------------------------
+SELECT
+  'VER' as driver_id,
+  COUNT(DISTINCT EventName) as races_participated,
+  COUNT(CASE WHEN Position = 1 THEN 1 END) as race_wins,
+  ROUND(AVG(Sector1_Speed_Avg), 2) as avg_speed_all_circuits,
+  ROUND(STDDEV(Sector1_Speed_Avg), 2) as speed_consistency,
+  (SELECT EventName
+   FROM `topicos-bases-datos.f1_data_warehouse.laps_enriched`
+   WHERE Driver = 'VER' AND SessionName = 'Race'
+   GROUP BY EventName
+   ORDER BY AVG(Sector1_Speed_Avg) DESC
+   LIMIT 1) as best_circuit
+FROM `topicos-bases-datos.f1_data_warehouse.laps_enriched`
+WHERE Driver = 'VER'                      
+  AND SessionName = 'Race'
+  AND Year BETWEEN 2021 AND 2024;
+--------------------------------------------------------------------------------
+
+📊 Estadísticas de la Query:
+  • Filas retornadas: 1
+  • Bytes procesados: 0.00 MB
+  • Bytes facturados: 0.00 MB
+  • Duración: 0:00:00.178000
+
+Resultados:
+--------------------------------------------------------------------------------
+driver_id       | races_participated | race_wins       | avg_speed_all_circuits | speed_consistency | best_circuit   
+---------------------------------------------------------------------------------------------------------------------
+VER             | 29              | 2832            | 209.94          | 33.95           | Styrian Grand Prix
+
+✅ Query ejecutada exitosamente
+
