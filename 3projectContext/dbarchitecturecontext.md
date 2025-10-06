@@ -110,10 +110,24 @@ Aquí es donde reside el verdadero poder de nuestro proyecto. BigQuery será nue
 
 ### Datos a Almacenar:
 
-* **`laps_2021_enriched.csv` (Tabla Principal):** Este es el corazón de nuestro análisis. Contiene la telemetría detallada por vuelta y sector.
-* `weather_2021.csv`: Datos meteorológicos a lo largo del tiempo, cruciales para el análisis contextual.
-* `race_control_2021.csv`: Mensajes de control de carrera para correlacionar eventos con datos de vuelta.
-* `results_2021.csv` (Tabla de conveniencia): Aunque los resultados se pueden derivar de los datos de vueltas, tener esta tabla pre-calculada en BigQuery simplificará enormemente la creación de visualizaciones de resumen en herramientas de BI como Looker.
+* **`laps_enriched_final` (Tabla Principal):** Este es el corazón de nuestro análisis. Contiene la telemetría detallada por vuelta y sector, completamente desnormalizada con datos de eventos.
+  - **Optimización**: Particionada por `EventDate`, Clustering por `["Driver", "EventName", "Country"]`
+  - **Filas**: 125,205 | **Tamaño**: 124.87 MB
+
+* **`weather`**: Datos meteorológicos a lo largo del tiempo, cruciales para el análisis contextual.
+  - **Optimización**: Clustering por `["EventName", "Year", "SessionName"]`
+  - **Filas**: 19,192 | **Tamaño**: 1.99 MB
+
+* **`race_control`**: Mensajes de control de carrera para correlacionar eventos con datos de vuelta.
+  - **Optimización**: Clustering por `["EventName", "Year", "Category"]`
+  - **Filas**: 10,479 | **Tamaño**: 1.21 MB
+
+* **`results`** (Tabla de conveniencia): Aunque los resultados se pueden derivar de los datos de vueltas, tener esta tabla pre-calculada en BigQuery simplificará enormemente la creación de visualizaciones de resumen en herramientas de BI como Looker.
+  - **Optimización**: Clustering por `["Abbreviation", "EventName", "Year"]`
+  - **⚠️ NOTA**: El campo del piloto se llama `Abbreviation` (no `Driver` como en laps_enriched)
+  - **Filas**: 2,558 | **Tamaño**: 0.79 MB
+
+**Referencia completa**: Ver `3projectContext/bigquery_schema_reference.md` para detalles de campos y queries optimizadas.
 
 ### Justificación Técnica:
 
