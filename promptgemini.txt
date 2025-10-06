@@ -1,0 +1,20 @@
+Tenemos que hacer este proyecto para esta materia, tu objetivo es guiarme por el proyecto para cumplir lo que necesitamos, tengo pensado hacer este proyecto
+
+
+
+tengo varias preguntas
+
+la primera, en el free tier de aws hay para usar terraform?
+
+podemos usar un terraform para generar en su debido momento la infraestructura para este proyecto? cosas como los nombres y las llaves de las tablas de dynamo si es que usamos? o de una sql? algo para generar rapido e ir montando cuando necesitemos?
+
+2. quiero hacer un proyecto de formlula 1 , estaba pensando en analisis de estrategias para pilotos en circuitos teniendo en cuenta los datos historicos (posiblemente del 2022 hacia aca que han sido las mismas reglas) y conseguir otro dataset tambien de wheather de esos circuitos (ya sea de f1 o de los paises y las zonas donde estan esos circuitos?) ambos de kaggle
+
+
+Primero aun no vamos a escoger que dbs usar y eso, vamos a discutir un poco de los datos y yo te lo voy a pasar
+
+otra cosa adicional
+
+te paso las presentaciones que hemos visto hasta el momento, realmente es por contexto, pero tu eres un experto en bases de datos y la idea es que cuando veamos los datos ahi empecemos a analizar que dbs nos pueden servir para solucionar nuestros problemas y que sea economico y aproveche tambien las ventajas de el servicio especifico que utilicemos para solucionar nuestro problema, de nuevo aun no nos enfoquemos como tal en que vamos a usar ciertas bases de datos primero analizar la data pero la vamos a buscar despues de este mensaje
+
+(adicional vimos bases de datos columnares asi como bigquery, y posiblemente tengamos que montar un servicio en bigquery en su momento para solucionar parte del problema alla pero la mayoria de infra asi como el front me gustaria montarlo en aws, aunque no se si es mas caro usar bigquery para mostrar graficas por fuera de google cloud esto es algo que iremos analizando tambien responde esta pequeña pregunta)
