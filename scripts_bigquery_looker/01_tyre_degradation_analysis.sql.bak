@@ -1,0 +1,433 @@
+-- ==============================================================================
+-- OBJETIVO 1: ANÁLISIS DE DEGRADACIÓN DE NEUMÁTICOS POR COMPUESTO
+-- ==============================================================================
+-- Descripción: Dashboard interactivo para comparar rendimiento y degradación
+--              de neumáticos (SOFT, MEDIUM, HARD) en circuitos clave
+--
+-- Visualización objetivo: Gráfica de líneas
+--   - Eje X: Número de vuelta del stint (TyreLife)
+--   - Eje Y: Tiempo de vuelta
+--   - Filtros: Circuito, Compuesto, Equipo, Año
+--
+-- Optimización: Usa particionamiento por EventDate y clustering por Driver/EventName
+-- ==============================================================================
+
+-- ==============================================================================
+-- QUERY 1.1: Degradación de Neumáticos - Vista Principal
+-- ==============================================================================
+-- Propósito: Analizar cómo evoluciona el tiempo de vuelta según el desgaste
+--            del neumático en carreras
+--
+-- Para Looker: Esta es la query base para el dashboard principal
+-- ==============================================================================
+
+WITH race_laps AS (
+  SELECT
+    -- Identificadores del evento
+    EventName,
+    EventDate,
+    Year,
+    Country,
+    Location,
+    SessionName,
+
+    -- Identificadores del piloto y equipo
+    Driver,
+    DriverNumber,
+    Team,
+
+    -- Datos del stint y neumático
+    Stint,
+    Compound,
+    TyreLife,
+    FreshTyre,
+
+    -- Tiempos de vuelta
+    LapNumber,
+    LapTime,
+
+    -- Convertir LapTime (TIME) a segundos usando función nativa
+    -- TIME_DIFF calcula diferencia desde medianoche (00:00:00)
+    TIME_DIFF(LapTime, TIME(0, 0, 0), SECOND) AS LapTimeSeconds,
+
+    -- Flags de estado
+    IsPersonalBest,
+    Deleted,
+    DeletedReason,
+
+    -- Datos de posición
+    Position,
+
+    -- Datos de velocidad por sector (para análisis adicional)
+    Sector1_Speed_Avg,
+    Sector2_Speed_Avg,
+    Sector3_Speed_Avg,
+
+    -- Track status para filtrar laps bajo Safety Car, VSC, etc.
+    TrackStatus
+
+  FROM `topicos-bases-datos.f1_data_warehouse.laps_enriched`
+
+  WHERE
+    -- ✅ OPTIMIZACIÓN: Usa particionamiento por EventDate
+    EventDate >= '2021-01-01'
+
+    -- Solo carreras (no clasificación, práctica, etc.)
+    AND SessionName = 'Race'
+
+    -- Filtrar vueltas válidas (no eliminadas)
+    AND Deleted = FALSE
+
+    -- Filtrar laps con tiempo válido (no NULL)
+    AND LapTime IS NOT NULL
+
+    -- Filtrar vueltas bajo condiciones normales
+    -- TrackStatus: 1 = pista verde, 2 = bandera amarilla, 4 = Safety Car, 6 = VSC
+    AND TrackStatus < 4  -- Green (1) o Yellow (2), excluye Safety Car
+
+    -- Filtrar compuestos válidos (excluir UNKNOWN, INTERMEDIATE, WET)
+    AND Compound IN ('SOFT', 'MEDIUM', 'HARD')
+
+    -- Filtrar outliers de tiempo (vueltas muy lentas, pit stops, etc.)
+    -- Asumimos que laps normales están entre 60s y 180s
+    AND (
+      CAST(SPLIT(LapTime, ':')[OFFSET(0)] AS INT64) * 3600 +
+      CAST(SPLIT(LapTime, ':')[OFFSET(1)] AS INT64) * 60 +
+      CAST(SPLIT(LapTime, ':')[OFFSET(2)] AS FLOAT64)
+    ) BETWEEN 60 AND 180
+),
+
+-- Calcular estadísticas agregadas por stint
+stint_stats AS (
+  SELECT
+    EventName,
+    EventDate,
+    Year,
+    Country,
+    Location,
+    Driver,
+    Team,
+    Stint,
+    Compound,
+
+    -- Estadísticas del stint
+    COUNT(*) as total_laps,
+    MIN(TyreLife) as stint_start_tyre_life,
+    MAX(TyreLife) as stint_end_tyre_life,
+    MAX(TyreLife) - MIN(TyreLife) + 1 as stint_length,
+
+    -- Tiempos promedio
+    AVG(LapTimeSeconds) as avg_lap_time_seconds,
+    MIN(LapTimeSeconds) as best_lap_time_seconds,
+    MAX(LapTimeSeconds) as worst_lap_time_seconds,
+    STDDEV(LapTimeSeconds) as lap_time_std_dev,
+
+    -- Velocidades promedio
+    AVG(Sector1_Speed_Avg) as avg_sector1_speed,
+    AVG(Sector2_Speed_Avg) as avg_sector2_speed,
+    AVG(Sector3_Speed_Avg) as avg_sector3_speed
+
+  FROM race_laps
+
+  -- Filtrar stints muy cortos (menos de 5 vueltas)
+  GROUP BY EventName, EventDate, Year, Country, Location, Driver, Team, Stint, Compound
+  HAVING COUNT(*) >= 5
+)
+
+-- Query final: Datos granulares por vuelta con contexto del stint
+SELECT
+  l.*,
+
+  -- Calcular degradación relativa dentro del stint
+  -- (tiempo actual - mejor tiempo del stint) / mejor tiempo
+  ROUND((l.LapTimeSeconds - s.best_lap_time_seconds) / s.best_lap_time_seconds * 100, 3)
+    as degradation_percent,
+
+  -- Metadata del stint
+  s.stint_length,
+  s.avg_lap_time_seconds as stint_avg_time,
+  s.best_lap_time_seconds as stint_best_time,
+  s.lap_time_std_dev as stint_consistency,
+
+  -- Formatear tiempo de vuelta legible
+  CONCAT(
+    CAST(CAST(l.LapTimeSeconds / 60 AS INT64) AS STRING), ':',
+    FORMAT('%06.3f', MOD(l.LapTimeSeconds, 60))
+  ) as lap_time_formatted
+
+FROM race_laps l
+JOIN stint_stats s
+  ON l.EventName = s.EventName
+  AND l.Year = s.Year
+  AND l.Driver = s.Driver
+  AND l.Stint = s.Stint
+
+-- Ordenar para facilitar visualización
+ORDER BY
+  l.Year DESC,
+  l.EventDate DESC,
+  l.Driver,
+  l.Stint,
+  l.TyreLife;
+
+
+-- ==============================================================================
+-- QUERY 1.2: Degradación Promedio por Compuesto y Circuito
+-- ==============================================================================
+-- Propósito: Vista agregada para comparar degradación entre compuestos
+--            en diferentes circuitos
+--
+-- Para Looker: Gráfica de barras o tabla comparativa
+-- ==============================================================================
+
+WITH lap_degradation AS (
+  SELECT
+    EventName,
+    Country,
+    Year,
+    Driver,
+    Team,
+    Stint,
+    Compound,
+    TyreLife,
+
+    -- Convertir tiempo a segundos
+    CAST(SPLIT(LapTime, ':')[OFFSET(0)] AS INT64) * 3600 +
+    CAST(SPLIT(LapTime, ':')[OFFSET(1)] AS INT64) * 60 +
+    CAST(SPLIT(LapTime, ':')[OFFSET(2)] AS FLOAT64) AS lap_seconds,
+
+    -- Mejor tiempo del stint (ventana)
+    MIN(
+      CAST(SPLIT(LapTime, ':')[OFFSET(0)] AS INT64) * 3600 +
+      CAST(SPLIT(LapTime, ':')[OFFSET(1)] AS INT64) * 60 +
+      CAST(SPLIT(LapTime, ':')[OFFSET(2)] AS FLOAT64)
+    ) OVER (
+      PARTITION BY EventName, Year, Driver, Stint
+    ) as stint_best_seconds
+
+  FROM `topicos-bases-datos.f1_data_warehouse.laps_enriched`
+
+  WHERE
+    EventDate >= '2021-01-01'
+    AND SessionName = 'Race'
+    AND Deleted = FALSE
+    AND LapTime IS NOT NULL
+    AND TrackStatus < 4  -- Excluye Safety Car, VSC, Red Flag
+    AND Compound IN ('SOFT', 'MEDIUM', 'HARD')
+    AND (
+      CAST(SPLIT(LapTime, ':')[OFFSET(0)] AS INT64) * 3600 +
+      CAST(SPLIT(LapTime, ':')[OFFSET(1)] AS INT64) * 60 +
+      CAST(SPLIT(LapTime, ':')[OFFSET(2)] AS FLOAT64)
+    ) BETWEEN 60 AND 180
+)
+
+SELECT
+  EventName,
+  Country,
+  Year,
+  Compound,
+
+  -- Estadísticas por compuesto en cada circuito
+  COUNT(DISTINCT CONCAT(Driver, '-', CAST(Stint AS STRING))) as total_stints,
+  ROUND(AVG(lap_seconds), 3) as avg_lap_time_seconds,
+
+  -- Degradación promedio por vuelta de vida del neumático
+  -- Agrupar por TyreLife para ver cómo evoluciona
+  ROUND(
+    AVG((lap_seconds - stint_best_seconds) / stint_best_seconds * 100),
+    3
+  ) as avg_degradation_percent,
+
+  -- Duración promedio de stint
+  ROUND(AVG(TyreLife), 1) as avg_tyre_life,
+  MAX(TyreLife) as max_tyre_life,
+
+  -- Consistencia (desviación estándar de degradación)
+  ROUND(STDDEV((lap_seconds - stint_best_seconds) / stint_best_seconds * 100), 3)
+    as degradation_std_dev
+
+FROM lap_degradation
+
+GROUP BY EventName, Country, Year, Compound
+
+ORDER BY Year DESC, EventName,
+  CASE Compound
+    WHEN 'SOFT' THEN 1
+    WHEN 'MEDIUM' THEN 2
+    WHEN 'HARD' THEN 3
+  END;
+
+
+-- ==============================================================================
+-- QUERY 1.3: Análisis de Degradación por TyreLife Específico
+-- ==============================================================================
+-- Propósito: Ver cómo cambia el tiempo de vuelta para cada vuelta de vida
+--            del neumático (ej: vuelta 1, 5, 10, 15, 20, etc.)
+--
+-- Para Looker: Gráfica de líneas con TyreLife en eje X
+-- ==============================================================================
+
+WITH tyre_performance AS (
+  SELECT
+    EventName,
+    Country,
+    Year,
+    Compound,
+    TyreLife,
+
+    -- Convertir tiempo
+    CAST(SPLIT(LapTime, ':')[OFFSET(0)] AS INT64) * 3600 +
+    CAST(SPLIT(LapTime, ':')[OFFSET(1)] AS INT64) * 60 +
+    CAST(SPLIT(LapTime, ':')[OFFSET(2)] AS FLOAT64) AS lap_seconds
+
+  FROM `topicos-bases-datos.f1_data_warehouse.laps_enriched`
+
+  WHERE
+    EventDate >= '2021-01-01'
+    AND SessionName = 'Race'
+    AND Deleted = FALSE
+    AND LapTime IS NOT NULL
+    AND TrackStatus < 4  -- Excluye Safety Car, VSC, Red Flag
+    AND Compound IN ('SOFT', 'MEDIUM', 'HARD')
+    AND TyreLife IS NOT NULL
+    AND (
+      CAST(SPLIT(LapTime, ':')[OFFSET(0)] AS INT64) * 3600 +
+      CAST(SPLIT(LapTime, ':')[OFFSET(1)] AS INT64) * 60 +
+      CAST(SPLIT(LapTime, ':')[OFFSET(2)] AS FLOAT64)
+    ) BETWEEN 60 AND 180
+)
+
+SELECT
+  EventName,
+  Country,
+  Year,
+  Compound,
+  TyreLife,
+
+  -- Estadísticas por cada vuelta de vida del neumático
+  COUNT(*) as sample_size,
+  ROUND(AVG(lap_seconds), 3) as avg_lap_time_seconds,
+  ROUND(MIN(lap_seconds), 3) as best_lap_time_seconds,
+  ROUND(STDDEV(lap_seconds), 3) as lap_time_std_dev,
+
+  -- Formatear tiempo promedio legible
+  CONCAT(
+    CAST(CAST(AVG(lap_seconds) / 60 AS INT64) AS STRING), ':',
+    FORMAT('%06.3f', MOD(AVG(lap_seconds), 60))
+  ) as avg_lap_time_formatted
+
+FROM tyre_performance
+
+-- Filtrar TyreLives con suficiente muestra
+GROUP BY EventName, Country, Year, Compound, TyreLife
+HAVING COUNT(*) >= 3
+
+ORDER BY Year DESC, EventName, Compound, TyreLife;
+
+
+-- ==============================================================================
+-- QUERY 1.4: Top Equipos por Gestión de Neumáticos
+-- ==============================================================================
+-- Propósito: Identificar qué equipos tienen mejor gestión de neumáticos
+--            (menor degradación a lo largo del stint)
+--
+-- Para Looker: Ranking de equipos
+-- ==============================================================================
+
+WITH stint_analysis AS (
+  SELECT
+    Year,
+    Team,
+    EventName,
+    Driver,
+    Stint,
+    Compound,
+
+    -- Calcular pendiente de degradación
+    CORR(
+      TyreLife,
+      CAST(SPLIT(LapTime, ':')[OFFSET(0)] AS INT64) * 3600 +
+      CAST(SPLIT(LapTime, ':')[OFFSET(1)] AS INT64) * 60 +
+      CAST(SPLIT(LapTime, ':')[OFFSET(2)] AS FLOAT64)
+    ) as degradation_correlation,
+
+    -- Duración del stint
+    COUNT(*) as stint_laps,
+    MAX(TyreLife) as max_tyre_life,
+
+    -- Tiempo promedio
+    AVG(
+      CAST(SPLIT(LapTime, ':')[OFFSET(0)] AS INT64) * 3600 +
+      CAST(SPLIT(LapTime, ':')[OFFSET(1)] AS INT64) * 60 +
+      CAST(SPLIT(LapTime, ':')[OFFSET(2)] AS FLOAT64)
+    ) as avg_lap_seconds
+
+  FROM `topicos-bases-datos.f1_data_warehouse.laps_enriched`
+
+  WHERE
+    EventDate >= '2021-01-01'
+    AND SessionName = 'Race'
+    AND Deleted = FALSE
+    AND LapTime IS NOT NULL
+    AND TrackStatus < 4  -- Excluye Safety Car, VSC, Red Flag
+    AND Compound IN ('SOFT', 'MEDIUM', 'HARD')
+    AND TyreLife IS NOT NULL
+    AND (
+      CAST(SPLIT(LapTime, ':')[OFFSET(0)] AS INT64) * 3600 +
+      CAST(SPLIT(LapTime, ':')[OFFSET(1)] AS INT64) * 60 +
+      CAST(SPLIT(LapTime, ':')[OFFSET(2)] AS FLOAT64)
+    ) BETWEEN 60 AND 180
+
+  GROUP BY Year, Team, EventName, Driver, Stint, Compound
+  HAVING COUNT(*) >= 10  -- Stints de al menos 10 vueltas
+)
+
+SELECT
+  Year,
+  Team,
+
+  -- Correlación promedio (menor = mejor gestión)
+  ROUND(AVG(degradation_correlation), 4) as avg_degradation_correlation,
+
+  -- Duración promedio de stint
+  ROUND(AVG(max_tyre_life), 1) as avg_stint_duration,
+
+  -- Número de stints largos exitosos
+  COUNT(*) as total_long_stints,
+
+  -- Tiempo promedio de vuelta
+  ROUND(AVG(avg_lap_seconds), 3) as overall_avg_lap_time
+
+FROM stint_analysis
+
+GROUP BY Year, Team
+
+ORDER BY Year DESC, avg_degradation_correlation ASC;
+
+
+-- ==============================================================================
+-- NOTAS DE USO PARA LOOKER
+-- ==============================================================================
+--
+-- 1. QUERY 1.1: Usar como base para el dashboard principal
+--    - Filtros recomendados: Year, EventName, Compound, Team, Driver
+--    - Visualización: Línea con TyreLife (X) vs LapTimeSeconds (Y)
+--    - Color por: Compound
+--    - Facet por: EventName o Team
+--
+-- 2. QUERY 1.2: Usar para comparativa de circuitos
+--    - Visualización: Tabla o barras agrupadas
+--    - Grouping: EventName, Compound
+--    - Métricas: avg_degradation_percent, avg_tyre_life
+--
+-- 3. QUERY 1.3: Usar para análisis detallado de degradación
+--    - Visualización: Línea suavizada
+--    - X: TyreLife
+--    - Y: avg_lap_time_seconds
+--    - Separate lines por: Compound
+--
+-- 4. QUERY 1.4: Usar para ranking de equipos
+--    - Visualización: Tabla ordenada
+--    - Sort: avg_degradation_correlation (ASC = mejor)
+--
+-- ==============================================================================
